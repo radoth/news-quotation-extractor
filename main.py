@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 from transformers import Trainer
-from transformers import DistilBertForTokenClassification
+from transformers import AlbertForTokenClassification
 import torch.nn as nn
 import torch
 from transformers import AutoTokenizer
@@ -37,10 +37,10 @@ logger.info("加载实体链接模型")
 EDmodel = GENRE.from_pretrained(
     "models/hf_entity_disambiguation_aidayago").eval()
 logger.info("加载引语模型")
-model = DistilBertForTokenClassification.from_pretrained(
-    "models/checkpoint-3300/", num_labels=8)
+model = AlbertForTokenClassification.from_pretrained(
+    "models/checkpoint-1200/", num_labels=8)
 trainer = Trainer(model=model)
-tokenizer = AutoTokenizer.from_pretrained('distilbert-base-cased')
+tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
 memo = {}
 
 # 构造数据集
@@ -240,6 +240,7 @@ def folderProcess(folder_path, output_folder_path):
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
                     data = json.loads(f.read())
+                    data['content']=data['content'].replace("''","\"").replace("„","\"").replace("“","\"").replace("‟","\"").replace("”","\"").replace("〝","\"").replace("〞","\"").replace("〟","\"").replace("‘","'").replace("’","'").replace("‛","'").replace(",",",").replace("—","-")
                     quote_dict = extractText(data['content'])
                     data['quote'] = quote_dict
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
