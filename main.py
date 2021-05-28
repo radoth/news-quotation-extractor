@@ -14,12 +14,17 @@ import json
 
 # 初始化logger
 logger = logging.getLogger(__name__)
-logger.setLevel(level=logging.INFO)
+logger.setLevel(level = logging.INFO)
 handler = logging.FileHandler("log.txt")
-handler.setLevel(level=logging.INFO)
+handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
+ 
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+ 
 logger.addHandler(handler)
+logger.addHandler(console)
 
 logger.info("程序初始化，加载实体表")
 
@@ -212,6 +217,7 @@ def extractText(txt):
     pred_res = trainer.predict(res_data)
     middle_result = displayFormatResult(
         res['input_ids'], res["attention_mask"], pred_res[0], res['offset_mapping'], offsets)
+    logger.info("引语提取结束，开始实体链接")
     for i in range(len(middle_result)):
         if type(middle_result[i]['mentionRaw']) != str:
             logger.warning("说话人不是字符串："+str(middle_result[i]))
