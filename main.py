@@ -22,6 +22,7 @@ handler.setFormatter(formatter)
  
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
+console.setFormatter(formatter)
  
 logger.addHandler(handler)
 logger.addHandler(console)
