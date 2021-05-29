@@ -10,6 +10,7 @@ from genre.hf_model import GENRE
 import logging
 import os
 import json
+import time
 
 device = "cuda"
 eval_batch_size = 16
@@ -175,7 +176,7 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                 else:
                     if tuple_list[t][1]-tuple_list[t][0] > 6:
                         mentionRaw=tokenizer.decode(input_id[i][tuple_list[back][0]:tuple_list[back][1]])
-                        if len(mentionRaw) > 4:
+                        if len(mentionRaw) > 1:
                             result.append({"mentionRaw": mentionRaw,
                                         "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[back][0]][0]+overall_offset[i][0]),
                                         "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[back][1]-1][1]+overall_offset[i][0]),
@@ -202,7 +203,7 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                 else:
                     if tuple_list[t][1]-tuple_list[t][0] > 6:
                         mentionRaw=tokenizer.decode(input_id[i][tuple_list[after][0]:tuple_list[after][1]])
-                        if len(mentionRaw) > 4:
+                        if len(mentionRaw) > 1:
                             result.append({"mentionRaw": mentionRaw,
                                         "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[after][0]][0]+overall_offset[i][0]),
                                         "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[after][1]-1][1]+overall_offset[i][0]),
@@ -233,44 +234,53 @@ def getEntity(txt):
 
 
 def extractText(txt):
-    torch.cuda.empty_cache() 
     segs, offsets = segment(txt)
     res = tokenizer(segs, padding='max_length', max_length=511,
                     truncation=True, return_offsets_mapping=True, return_tensors="pt").to(device)
+    token_time=time.time()
     res_data = TestDataset(res)
     pred_res = predict(res_data)
     res = res.to('cpu')
+    extract_time=time.time()
     middle_result = displayFormatResult(
         res['input_ids'].numpy(), res["attention_mask"].numpy(), pred_res, res['offset_mapping'].numpy(), offsets)
     # logger.info("引语提取结束，开始实体链接")
+    process_time=time.time()
     for i in range(len(middle_result)):
         if type(middle_result[i]['mentionRaw']) != str:
             logger.warning("说话人不是字符串："+str(middle_result[i]))
+            
         else:
             linked = getEntity(middle_result[i]['mentionRaw'])
             middle_result[i]['mention'] = linked[0]
             middle_result[i]['mentionLinkLogProb'] = linked[1]
             middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
                 linked[0].strip().replace(' ', "_")
-    return middle_result
+    linking_time=time.time()
+    return middle_result,token_time,extract_time,process_time,linking_time
 
 # 按文件夹处理文件
 
 
 def folderProcess(folder_path, output_folder_path):
     files = sorted(os.listdir(folder_path))
-    for i in files:
+    files_len=len(files)
+    for no,i in enumerate(files):
+        if no % 100 ==0:
+            torch.cuda.empty_cache() 
+            logger.info("清除 CUDA Cache")
         try:
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
+                    start_time=time.time()
                     data = json.loads(f.read())
                     data['content'] = data['content'].replace("''", "\"").replace("„", "\"").replace("“", "\"").replace("‟", "\"").replace("”", "\"").replace(
                         "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")
-                    quote_dict = extractText(data['content'])
+                    quote_dict,token_time,extract_time,process_time,linking_time= extractText(data['content'])
                     data['quote'] = quote_dict
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
                         json.dump(data, fw)
-                logger.info("输出文件 "+str(i))
+                logger.info("进度 "+str(int(no/files_len*100))+" % ，输出文件 "+str(i)+" ，总耗时 "+str(int((time.time()-start_time)*1000))+" ms 分词耗时 "+str(int((token_time-start_time)*1000))+" ms 提取耗时 "+str(int((extract_time-token_time)*1000))+" ms 处理耗时 "+str(int((process_time-extract_time)*1000))+" ms 链接耗时 "+str(int((linking_time-extract_time)*1000))+" ms")
             else:
                 logger.warning("忽略文件 "+str(i))
         except Exception:
