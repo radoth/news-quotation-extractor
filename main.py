@@ -11,20 +11,22 @@ import logging
 import os
 import json
 
-device="cuda"
+device = "cuda"
+eval_batch_size = 16
 
 # 初始化logger
 logger = logging.getLogger(__name__)
-logger.setLevel(level = logging.INFO)
+logger.setLevel(level=logging.INFO)
 handler = logging.FileHandler("log.txt")
 handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
- 
+
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
 console.setFormatter(formatter)
- 
+
 logger.addHandler(handler)
 logger.addHandler(console)
 
@@ -44,9 +46,11 @@ EDmodel = GENRE.from_pretrained(
 memo = {}
 
 # 构造数据集
+
+
 class TestDataset(torch.utils.data.Dataset):
     def __init__(self, dic):
-        self.dic=dic
+        self.dic = dic
 
     def __getitem__(self, idx):
         item = {"input_ids": self.dic['input_ids'][idx],
@@ -58,15 +62,15 @@ class TestDataset(torch.utils.data.Dataset):
 
 
 def predict(dataset):
-    loader=DataLoader(dataset,batch_size=8)
+    loader = DataLoader(dataset, batch_size=eval_batch_size)
     model.eval()
-    output=np.array([])
-    for step,batch in enumerate(loader):
+    output = np.array([])
+    for step, batch in enumerate(loader):
         with torch.no_grad():
-            outputs=model(**batch).logits.cpu().numpy()
-            output=np.append(output,outputs)
-    return np.reshape(output,(-1,511,8))
-        
+            outputs = model(**batch).logits.cpu().numpy()
+            output = np.append(output, outputs)
+    return np.reshape(output, (-1, 511, 8))
+
 
 # 按换行符分段
 
@@ -144,60 +148,65 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                 pass
 
             elif tuple_type[t] == 1:
-                result.append({"mentionRaw": "Unknown",
-                               "quoteSpeakerCharOffsetsFirst": -1,
-                               "quoteSpeakerCharOffsetsSecond": -1,
-                               "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
-                               "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
-                               "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
-                               "SegmentOffset": str(overall_offset[i][0]),
-                               "Type": "Anonymous"})
+                if False:
+                    result.append({"mentionRaw": "Unknown",
+                                   "quoteSpeakerCharOffsetsFirst": -1,
+                                   "quoteSpeakerCharOffsetsSecond": -1,
+                                   "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                   "SegmentOffset": str(overall_offset[i][0]),
+                                   "Type": "Anonymous"})
 
             elif tuple_type[t] == 2:
                 back = t
                 while back >= 0 and tuple_type[back] != 0:
                     back -= 1
                 if back < 0:
-                    result.append({"mentionRaw": "Unknown",
-                                   "quoteSpeakerCharOffsetsFirst": -1,
-                                   "quoteSpeakerCharOffsetsSecond": -1,
-                                   "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
-                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
-                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
-                                   "SegmentOffset": str(overall_offset[i][0]),
-                                   "Type": "TowardsLeftFailed"})
+                    if False:
+                        result.append({"mentionRaw": "Unknown",
+                                       "quoteSpeakerCharOffsetsFirst": -1,
+                                       "quoteSpeakerCharOffsetsSecond": -1,
+                                       "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                                       "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                       "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                       "SegmentOffset": str(overall_offset[i][0]),
+                                       "Type": "TowardsLeftFailed"})
                 else:
-                    result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[back][0]:tuple_list[back][1]]),
-                                   "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[back][0]][0]+overall_offset[i][0]),
-                                   "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[back][1]-1][1]+overall_offset[i][0]),
-                                   "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
-                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
-                                   "SegmentOffset": str(overall_offset[i][0]),
-                                   "Type": "TowardsLeftSucceeded"})
+                    if tuple_list[t][1]-tuple_list[t][0] > 6:
+                        result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[back][0]:tuple_list[back][1]]),
+                                       "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[back][0]][0]+overall_offset[i][0]),
+                                       "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[back][1]-1][1]+overall_offset[i][0]),
+                                       "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
+                                       "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                       "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                       "SegmentOffset": str(overall_offset[i][0]),
+                                       "Type": "TowardsLeftSucceeded"})
 
             elif tuple_type[t] == 3:
                 after = t
                 while after < len(tuple_type) and tuple_type[after] != 0:
                     after += 1
                 if after >= len(tuple_type):
-                    result.append({"mentionRaw": "Unknown",
-                                   "quoteSpeakerCharOffsetsFirst": -1,
-                                   "quoteSpeakerCharOffsetsSecond": -1,
-                                   "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
-                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
-                                   "quoteCharOffsetsSecond":str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
-                                   "SegmentOffset": str(overall_offset[i][0]),
-                                  "Type": "TowardsRightFailed"})
+                    if False:
+                        result.append({"mentionRaw": "Unknown",
+                                       "quoteSpeakerCharOffsetsFirst": -1,
+                                       "quoteSpeakerCharOffsetsSecond": -1,
+                                       "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                                       "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                       "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                       "SegmentOffset": str(overall_offset[i][0]),
+                                       "Type": "TowardsRightFailed"})
                 else:
-                    result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[after][0]:tuple_list[after][1]]),
-                                   "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[after][0]][0]+overall_offset[i][0]),
-                                   "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[after][1]-1][1]+overall_offset[i][0]),
-                                   "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
-                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
-                                   "SegmentOffset": str(overall_offset[i][0]),
-                                  "Type": "TowardsRightSucceeded"})
+                    if tuple_list[t][1]-tuple_list[t][0] > 6:
+                        result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[after][0]:tuple_list[after][1]]),
+                                       "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[after][0]][0]+overall_offset[i][0]),
+                                       "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[after][1]-1][1]+overall_offset[i][0]),
+                                       "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
+                                       "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                       "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                       "SegmentOffset": str(overall_offset[i][0]),
+                                       "Type": "TowardsRightSucceeded"})
     return result
 
 # 实体链接
@@ -222,8 +231,8 @@ def getEntity(txt):
 def extractText(txt):
     segs, offsets = segment(txt)
     res = tokenizer(segs, padding='max_length', max_length=511,
-                    truncation=True, return_offsets_mapping=True,return_tensors="pt").to(device)
-    res_data = TestDataset(res) 
+                    truncation=True, return_offsets_mapping=True, return_tensors="pt").to(device)
+    res_data = TestDataset(res)
     pred_res = predict(res_data)
     res = res.to('cpu')
     middle_result = displayFormatResult(
@@ -250,7 +259,8 @@ def folderProcess(folder_path, output_folder_path):
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
                     data = json.loads(f.read())
-                    data['content']=data['content'].replace("''","\"").replace("„","\"").replace("“","\"").replace("‟","\"").replace("”","\"").replace("〝","\"").replace("〞","\"").replace("〟","\"").replace("‘","'").replace("’","'").replace("‛","'").replace(",",",").replace("—","-")
+                    data['content'] = data['content'].replace("''", "\"").replace("„", "\"").replace("“", "\"").replace("‟", "\"").replace("”", "\"").replace(
+                        "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")
                     quote_dict = extractText(data['content'])
                     data['quote'] = quote_dict
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
