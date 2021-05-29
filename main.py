@@ -13,6 +13,8 @@ import logging
 import os
 import json
 
+device="cuda"
+
 # 初始化logger
 logger = logging.getLogger(__name__)
 logger.setLevel(level = logging.INFO)
@@ -28,18 +30,10 @@ console.setFormatter(formatter)
 logger.addHandler(handler)
 logger.addHandler(console)
 
-logger.info("程序初始化，加载实体表")
-
-# 加载模型参数
-with open("models/kilt_titles_trie_dict.pkl", "rb") as f:
-    trie = Trie.load_from_dict(pickle.load(f))
-
-logger.info("加载实体链接模型")
-EDmodel = GENRE.from_pretrained(
-    "models/hf_entity_disambiguation_aidayago").eval()
 logger.info("加载引语模型")
+tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
 model = AlbertForTokenClassification.from_pretrained(
-    "models/checkpoint-1200/", num_labels=8)
+    "models/checkpoint-1200/", num_labels=8).to(device).eval()
 training_args = TrainingArguments(
     output_dir='./results',          # output directory
     per_device_train_batch_size=1024,  # batch size per device during training
@@ -47,12 +41,17 @@ training_args = TrainingArguments(
 
 )
 trainer = Trainer(model=model,args=training_args)
-tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
+
+logger.info("程序初始化，加载实体表")
+# 加载模型参数
+with open("models/kilt_titles_trie_dict.pkl", "rb") as f:
+    trie = Trie.load_from_dict(pickle.load(f))
+logger.info("加载实体链接模型")
+EDmodel = GENRE.from_pretrained(
+    "models/hf_entity_disambiguation_aidayago").to(device).eval()
 memo = {}
 
 # 构造数据集
-
-
 class TestDataset(torch.utils.data.Dataset):
     def __init__(self, input_ids, attention_mask):
         self.input_ids = input_ids
@@ -221,10 +220,13 @@ def extractText(txt):
     segs, offsets = segment(txt)
     res = tokenizer(segs, padding='max_length', max_length=511,
                     truncation=True, return_offsets_mapping=True)
-    res_data = TestDataset(res['input_ids'], res["attention_mask"])
-    pred_res = trainer.predict(res_data)
+    res_data = TestDataset(res['input_ids'], res["attention_mask"]) 
+    res2=tokenizer(segs, padding='max_length', max_length=511,
+                    truncation=True,return_tensors="pt").to(device)
+    pred_res = model(**res2)['logits'].to('cpu').detach().numpy()
+#     pred_res = trainer.predict(res_data)
     middle_result = displayFormatResult(
-        res['input_ids'], res["attention_mask"], pred_res[0], res['offset_mapping'], offsets)
+        res['input_ids'], res["attention_mask"], pred_res, res['offset_mapping'], offsets)
     logger.info("引语提取结束，开始实体链接")
     for i in range(len(middle_result)):
         if type(middle_result[i]['mentionRaw']) != str:
@@ -261,5 +263,5 @@ def folderProcess(folder_path, output_folder_path):
 
 logger.info("加载完成，开始处理文件")
 
-folderProcess("C:\\Users\\tom\\Desktop\\testin",
-              "C:\\Users\\tom\\Desktop\\testout")
+folderProcess("testin",
+              "testout")
