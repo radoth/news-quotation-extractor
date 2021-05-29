@@ -1,3 +1,6 @@
 models/
 .ipynb_checkpoints/
 ApplyModel.ipynb
+.idea/
+checkpoint-3300/
+log.txt

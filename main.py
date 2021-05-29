@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 from transformers import Trainer
 from transformers import AlbertForTokenClassification
+from transformers import TrainingArguments
 import torch.nn as nn
 import torch
 from transformers import AutoTokenizer
@@ -39,7 +40,13 @@ EDmodel = GENRE.from_pretrained(
 logger.info("加载引语模型")
 model = AlbertForTokenClassification.from_pretrained(
     "models/checkpoint-1200/", num_labels=8)
-trainer = Trainer(model=model)
+training_args = TrainingArguments(
+    output_dir='./results',          # output directory
+    per_device_train_batch_size=1024,  # batch size per device during training
+    per_device_eval_batch_size=1024,   # batch size for evaluation
+
+)
+trainer = Trainer(model=model,args=training_args)
 tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
 memo = {}
 
