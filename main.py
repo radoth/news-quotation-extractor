@@ -1,8 +1,6 @@
 # -*- coding:utf-8 -*-
-from transformers import Trainer
 from transformers import AlbertForTokenClassification
-from transformers import TrainingArguments
-import torch.nn as nn
+from torch.utils.data.dataloader import DataLoader
 import torch
 from transformers import AutoTokenizer
 import numpy as np
@@ -34,13 +32,7 @@ logger.info("加载引语模型")
 tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
 model = AlbertForTokenClassification.from_pretrained(
     "models/checkpoint-1200/", num_labels=8).to(device).eval()
-training_args = TrainingArguments(
-    output_dir='./results',          # output directory
-    per_device_train_batch_size=1024,  # batch size per device during training
-    per_device_eval_batch_size=1024,   # batch size for evaluation
 
-)
-trainer = Trainer(model=model,args=training_args)
 
 logger.info("程序初始化，加载实体表")
 # 加载模型参数
@@ -53,17 +45,28 @@ memo = {}
 
 # 构造数据集
 class TestDataset(torch.utils.data.Dataset):
-    def __init__(self, input_ids, attention_mask):
-        self.input_ids = input_ids
-        self.attention_mask = attention_mask
+    def __init__(self, dic):
+        self.dic=dic
 
     def __getitem__(self, idx):
-        item = {"input_ids": self.input_ids[idx],
-                "attention_mask": self.attention_mask[idx]}
+        item = {"input_ids": self.dic['input_ids'][idx],
+                "attention_mask": self.dic['attention_mask'][idx]}
         return item
 
     def __len__(self):
-        return len(self.input_ids)
+        return len(self.dic['input_ids'])
+
+
+def predict(dataset):
+    loader=DataLoader(dataset,batch_size=8)
+    model.eval()
+    output=np.array([])
+    for step,batch in enumerate(loader):
+        with torch.no_grad():
+            outputs=model(**batch).logits.cpu().numpy()
+            output=np.append(output,outputs)
+    return np.reshape(output,(-1,511,8))
+        
 
 # 按换行符分段
 
@@ -144,10 +147,10 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                 result.append({"mentionRaw": "Unknown",
                                "quoteSpeakerCharOffsetsFirst": -1,
                                "quoteSpeakerCharOffsetsSecond": -1,
-                               "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                               "quoteCharOffsetsFirst": offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0],
-                               "quoteCharOffsetsSecond": offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0],
-                               "SegmentOffset": overall_offset[i][0],
+                               "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                               "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                               "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                               "SegmentOffset": str(overall_offset[i][0]),
                                "Type": "Anonymous"})
 
             elif tuple_type[t] == 2:
@@ -158,19 +161,19 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                     result.append({"mentionRaw": "Unknown",
                                    "quoteSpeakerCharOffsetsFirst": -1,
                                    "quoteSpeakerCharOffsetsSecond": -1,
-                                   "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0],
-                                   "quoteCharOffsetsSecond": offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0],
-                                   "SegmentOffset": overall_offset[i][0],
+                                   "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                   "SegmentOffset": str(overall_offset[i][0]),
                                    "Type": "TowardsLeftFailed"})
                 else:
                     result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[back][0]:tuple_list[back][1]]),
-                                   "quoteSpeakerCharOffsetsFirst": offset_map[i][tuple_list[back][0]][0]+overall_offset[i][0],
-                                   "quoteSpeakerCharOffsetsSecond": offset_map[i][tuple_list[back][1]-1][1]+overall_offset[i][0],
+                                   "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[back][0]][0]+overall_offset[i][0]),
+                                   "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[back][1]-1][1]+overall_offset[i][0]),
                                    "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0],
-                                   "quoteCharOffsetsSecond": offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0],
-                                   "SegmentOffset": overall_offset[i][0],
+                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                   "SegmentOffset": str(overall_offset[i][0]),
                                    "Type": "TowardsLeftSucceeded"})
 
             elif tuple_type[t] == 3:
@@ -181,19 +184,19 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
                     result.append({"mentionRaw": "Unknown",
                                    "quoteSpeakerCharOffsetsFirst": -1,
                                    "quoteSpeakerCharOffsetsSecond": -1,
-                                   "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0],
-                                   "quoteCharOffsetsSecond": offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0],
-                                   "SegmentOffset": overall_offset[i][0],
+                                   "quotation": str(tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]])),
+                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                   "quoteCharOffsetsSecond":str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                   "SegmentOffset": str(overall_offset[i][0]),
                                   "Type": "TowardsRightFailed"})
                 else:
                     result.append({"mentionRaw": tokenizer.decode(input_id[i][tuple_list[after][0]:tuple_list[after][1]]),
-                                   "quoteSpeakerCharOffsetsFirst": offset_map[i][tuple_list[after][0]][0]+overall_offset[i][0],
-                                   "quoteSpeakerCharOffsetsSecond": offset_map[i][tuple_list[after][1]-1][1]+overall_offset[i][0],
+                                   "quoteSpeakerCharOffsetsFirst": str(offset_map[i][tuple_list[after][0]][0]+overall_offset[i][0]),
+                                   "quoteSpeakerCharOffsetsSecond": str(offset_map[i][tuple_list[after][1]-1][1]+overall_offset[i][0]),
                                    "quotation": tokenizer.decode(input_id[i][tuple_list[t][0]:tuple_list[t][1]]),
-                                   "quoteCharOffsetsFirst": offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0],
-                                   "quoteCharOffsetsSecond": offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0],
-                                   "SegmentOffset": overall_offset[i][0],
+                                   "quoteCharOffsetsFirst": str(offset_map[i][tuple_list[t][0]][0]+overall_offset[i][0]),
+                                   "quoteCharOffsetsSecond": str(offset_map[i][tuple_list[t][1]-1][1]+overall_offset[i][0]),
+                                   "SegmentOffset": str(overall_offset[i][0]),
                                   "Type": "TowardsRightSucceeded"})
     return result
 
@@ -219,14 +222,12 @@ def getEntity(txt):
 def extractText(txt):
     segs, offsets = segment(txt)
     res = tokenizer(segs, padding='max_length', max_length=511,
-                    truncation=True, return_offsets_mapping=True)
-    res_data = TestDataset(res['input_ids'], res["attention_mask"]) 
-    res2=tokenizer(segs, padding='max_length', max_length=511,
-                    truncation=True,return_tensors="pt").to(device)
-    pred_res = model(**res2)['logits'].to('cpu').detach().numpy()
-#     pred_res = trainer.predict(res_data)
+                    truncation=True, return_offsets_mapping=True,return_tensors="pt").to(device)
+    res_data = TestDataset(res) 
+    pred_res = predict(res_data)
+    res = res.to('cpu')
     middle_result = displayFormatResult(
-        res['input_ids'], res["attention_mask"], pred_res, res['offset_mapping'], offsets)
+        res['input_ids'].numpy(), res["attention_mask"].numpy(), pred_res, res['offset_mapping'].numpy(), offsets)
     logger.info("引语提取结束，开始实体链接")
     for i in range(len(middle_result)):
         if type(middle_result[i]['mentionRaw']) != str:
