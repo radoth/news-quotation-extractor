@@ -23,13 +23,13 @@ pronouns = ["my", "your", "his", "her", "its", "our", "your", "their"]
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 handler = logging.FileHandler("log.txt")
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 
 console = logging.StreamHandler()
-console.setLevel(logging.INFO)
+console.setLevel(logging.DEBUG)
 console.setFormatter(formatter)
 
 logger.addHandler(handler)
@@ -248,9 +248,10 @@ def getCoreference(parsed_doc, speaker_begin, speaker_end):
     if sent_span._.is_coref:
         target = sent_span._.coref_cluster.main
         target_sent = target.sent
-        sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
-            target.string + \
-            " [END_ENT] "+target_sent.string[target.end_char-target_sent.start_char:]
+        # sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
+            # target.string + \
+            # " [END_ENT] "+target_sent.string[target.end_char-target_sent.start_char:]
+        sentence_for_link="[START_ENT] "+target.string+" [END_ENT]"
         logger.debug(target.string+"\t"+sentence_for_link)
         return getEntity(sentence_for_link), target.string, target.start_char, target.end_char
     else:
@@ -258,10 +259,11 @@ def getCoreference(parsed_doc, speaker_begin, speaker_end):
             if i.string[0].isupper() and (i.string.lower() not in pronouns) and i._.in_coref:
                 target = i._.coref_clusters[0].main
                 target_sent = target.sent
-                sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
-                    target.string + \
-                    " [END_ENT] "+target_sent.string[target.end_char -
-                                                     target_sent.start_char:]
+                # sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
+                    # target.string + \
+                    # " [END_ENT] "+target_sent.string[target.end_char -
+                                                    #  target_sent.start_char:]
+                sentence_for_link="[START_ENT] "+target.string+" [END_ENT]"
                 logger.debug(target.string+"\t"+sentence_for_link)
                 return getEntity(sentence_for_link), target.string, target.start_char, target.end_char
         return None
