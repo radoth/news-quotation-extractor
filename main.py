@@ -17,7 +17,8 @@ import neuralcoref
 device = "cuda"
 eval_batch_size = 16
 
-pronouns = ["my", "your", "his", "her", "its", "our", "your", "their"]
+pronouns = ["i", "me", "you", "he", "him", "she", "her", "it", "we", "us", "they", "them", "my", "mine", "your", "yours",
+            "his", "her", "hers", "its", "our", "ours", "their", "theirs"]
 
 # 初始化logger
 logger = logging.getLogger(__name__)
@@ -225,19 +226,24 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
 
 
 # 实体链接
-
+entity_linking_sum=0
 
 def getEntity(txt):
+    global entity_linking_sum
+    count=time.time()
     if txt in memo:
+        entity_linking_sum+=(time.time()-count)
         return memo[txt]
     else:
         if type(txt) != str:
             raise Exception("说话人不是字符串")
         else:
             sentences = txt
+            logger.debug(sentences)
             result = EDmodel.sample(
                 sentences, prefix_allowed_tokens_fn=lambda batch_id, sent: trie.get(sent.tolist()))
             memo[txt] = (result[0][0]['text'], result[0][0]['logprob'].item())
+            entity_linking_sum+=(time.time()-count)
             return result[0][0]['text'], result[0][0]['logprob'].item()
 
 
@@ -291,7 +297,7 @@ def extractText(txt):
         if type(middle_result[i]['mentionRaw']) != str:
             logger.warning("说话人不是字符串："+str(middle_result[i]))
 
-        elif middle_result[i]['quoteSpeakerCharOffsetsFirst'] != -1 and middle_result[i]['quoteSpeakerCharOffsetsSecond'] != -1:
+        elif middle_result[i]['mentionRaw'].strip().lower() in pronouns:
             resoluted = getCoreference(parsed_doc, int(middle_result[i]['quoteSpeakerCharOffsetsFirst']), int(
                 middle_result[i]['quoteSpeakerCharOffsetsSecond']))
             if resoluted is not None:
@@ -303,9 +309,21 @@ def extractText(txt):
                 middle_result[i]['coreferenceResult'] = target_name
                 middle_result[i]['coreferenceResultOffsetBegin'] = target_start
                 middle_result[i]['coreferenceResultOffsetEnd'] = target_end
+            else:
+                linked = getEntity(
+                    "[START_ENT] "+middle_result[i]['mentionRaw']+" [END_ENT]")
+                middle_result[i]['mention'] = linked[0]
+                middle_result[i]['mentionLinkLogProb'] = linked[1]
+                middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
+                    linked[0].strip().replace(' ', "_")
 
         else:
-            middle_result[i]['mention'] = "Unknown"
+            linked = getEntity("[START_ENT] "+middle_result[i]
+                               ['mentionRaw']+" [END_ENT]")
+            middle_result[i]['mention'] = linked[0]
+            middle_result[i]['mentionLinkLogProb'] = linked[1]
+            middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
+                linked[0].strip().replace(' ', "_")
     linking_time = time.time()
     return middle_result, token_time, extract_time, process_time, parsing_time, linking_time
 
@@ -313,6 +331,7 @@ def extractText(txt):
 
 
 def folderProcess(folder_path, output_folder_path):
+    global entity_linking_sum
     files = sorted(os.listdir(folder_path))
     files_len = len(files)
     for no, i in enumerate(files):
@@ -323,6 +342,7 @@ def folderProcess(folder_path, output_folder_path):
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
                     start_time = time.time()
+                    entity_linking_sum=0.0
                     data = json.loads(f.read())
                     data['content'] = data['content'].replace("''", "\"").replace("„", "\"").replace("“", "\"").replace("‟", "\"").replace("”", "\"").replace(
                         "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")
@@ -331,8 +351,8 @@ def folderProcess(folder_path, output_folder_path):
                     data['quote'] = quote_dict
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
                         json.dump(data, fw)
-                logger.info("进度：{:.2f}%\t输出文件 {}\t总耗时{:.0f}ms\t分词耗时{:.0f}ms\t提取耗时{:.0f}ms\t处理耗时{:.0f}ms\t指代消解耗时{:.0f}ms\t实体链接耗时{:.0f}ms".format(no/files_len*100, i, (time.time()-start_time)
-                            * 1000, (token_time-start_time)*1000, (extract_time-token_time)*1000, (process_time-extract_time)*1000, (parsing_time-process_time)*1000, (linking_time-parsing_time)*1000))
+                logger.info("进度：{:.2f}%\t输出文件 {}\t总耗时{:.0f}ms\t分词耗时{:.0f}ms\t提取耗时{:.0f}ms\t处理耗时{:.0f}ms\t指代消解耗时{:.0f}ms\t实体链接耗时{:.0f}ms\t实体链接实际耗时{:.0f}ms".format(no/files_len*100, i, (time.time()-start_time)
+                            * 1000, (token_time-start_time)*1000, (extract_time-token_time)*1000, (process_time-extract_time)*1000, (parsing_time-process_time)*1000, (linking_time-parsing_time)*1000,entity_linking_sum*1000))
                 logger.debug("momo size = "+str(len(memo.keys())))
             else:
                 logger.warning("忽略文件 "+str(i))
