@@ -4,15 +4,13 @@ from torch.utils.data.dataloader import DataLoader
 import torch
 from transformers import AutoTokenizer
 import numpy as np
-import pickle
-from genre.trie import Trie
-from genre.hf_model import GENRE
 import logging
 import os
 import json
 import time
 import spacy
 import neuralcoref
+from spacyEntityLinker import EntityLinker
 
 device = "cuda"
 eval_batch_size = 16
@@ -45,14 +43,11 @@ logger.info("加载指代消解模型")
 nlp = spacy.load('en_core_web_sm')
 neuralcoref.add_to_pipe(nlp)
 
-logger.info("程序初始化，加载实体表")
-# 加载模型参数
-with open("models/kilt_titles_trie_dict.pkl", "rb") as f:
-    trie = Trie.load_from_dict(pickle.load(f))
 logger.info("加载实体链接模型")
-EDmodel = GENRE.from_pretrained(
-    "models/hf_entity_disambiguation_aidayago").to(device).eval()
-memo = {}
+nlp2 = spacy.load('en_core_web_sm')
+entityLinker = EntityLinker()
+nlp2.add_pipe(entityLinker, last=True, name="entityLinker")
+
 
 # 构造数据集
 
@@ -226,25 +221,26 @@ def displayFormatResult(input_id, attention, prediction, offset_map, overall_off
 
 
 # 实体链接
-entity_linking_sum=0
+entity_linking_sum = 0
+
 
 def getEntity(txt):
     global entity_linking_sum
-    count=time.time()
-    if txt in memo:
-        entity_linking_sum+=(time.time()-count)
-        return memo[txt]
+    count = time.time()
+    doc = nlp2(txt)
+
+    if len(doc._.linkedEntities) == 0:
+        entity_linking_sum += (time.time()-count)
+        return None
     else:
-        if type(txt) != str:
-            raise Exception("说话人不是字符串")
-        else:
-            sentences = txt
-            logger.debug(sentences)
-            result = EDmodel.sample(
-                sentences, prefix_allowed_tokens_fn=lambda batch_id, sent: trie.get(sent.tolist()))
-            memo[txt] = (result[0][0]['text'], result[0][0]['logprob'].item())
-            entity_linking_sum+=(time.time()-count)
-            return result[0][0]['text'], result[0][0]['logprob'].item()
+        entity_linking_sum += (time.time()-count)
+        return {
+            "label": str(doc._.linkedEntities[0].get_label()),
+            "id": str(doc._.linkedEntities[0].get_id()),
+            "span": str(doc._.linkedEntities[0].get_span()),
+            "description": str(doc._.linkedEntities[0].get_description()),
+            "super_entities": tuple(str(i) for i in doc._.linkedEntities[0].get_super_entities(limit=10))
+        }
 
 
 # 指代消解
@@ -253,26 +249,9 @@ def getCoreference(parsed_doc, speaker_begin, speaker_end):
         speaker_begin, speaker_end, alignment_mode="expand")
     if sent_span._.is_coref:
         target = sent_span._.coref_cluster.main
-        target_sent = target.sent
-        # sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
-            # target.string + \
-            # " [END_ENT] "+target_sent.string[target.end_char-target_sent.start_char:]
-        sentence_for_link="[START_ENT] "+target.string+" [END_ENT]"
-        logger.debug(target.string+"\t"+sentence_for_link)
-        return getEntity(sentence_for_link), target.string, target.start_char, target.end_char
+        return target.string, target.start_char, target.end_char, True
     else:
-        for i in sent_span:
-            if i.string[0].isupper() and (i.string.lower() not in pronouns) and i._.in_coref:
-                target = i._.coref_clusters[0].main
-                target_sent = target.sent
-                # sentence_for_link = target_sent.string[0:target.start_char-target_sent.start_char]+" [START_ENT] " + \
-                    # target.string + \
-                    # " [END_ENT] "+target_sent.string[target.end_char -
-                                                    #  target_sent.start_char:]
-                sentence_for_link="[START_ENT] "+target.string+" [END_ENT]"
-                logger.debug(target.string+"\t"+sentence_for_link)
-                return getEntity(sentence_for_link), target.string, target.start_char, target.end_char
-        return None
+        return sent_span.string, sent_span.start_char, sent_span.end_char, False
 
 
 # 处理单个文件
@@ -297,33 +276,30 @@ def extractText(txt):
         if type(middle_result[i]['mentionRaw']) != str:
             logger.warning("说话人不是字符串："+str(middle_result[i]))
 
-        elif middle_result[i]['mentionRaw'].strip().lower() in pronouns:
-            resoluted = getCoreference(parsed_doc, int(middle_result[i]['quoteSpeakerCharOffsetsFirst']), int(
-                middle_result[i]['quoteSpeakerCharOffsetsSecond']))
-            if resoluted is not None:
-                linked, target_name, target_start, target_end = resoluted
-                middle_result[i]['mention'] = linked[0]
-                middle_result[i]['mentionLinkLogProb'] = linked[1]
-                middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
-                    linked[0].strip().replace(' ', "_")
-                middle_result[i]['coreferenceResult'] = target_name
-                middle_result[i]['coreferenceResultOffsetBegin'] = target_start
-                middle_result[i]['coreferenceResultOffsetEnd'] = target_end
-            else:
-                linked = getEntity(
-                    "[START_ENT] "+middle_result[i]['mentionRaw']+" [END_ENT]")
-                middle_result[i]['mention'] = linked[0]
-                middle_result[i]['mentionLinkLogProb'] = linked[1]
-                middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
-                    linked[0].strip().replace(' ', "_")
+        elif int(middle_result[i]['quoteSpeakerCharOffsetsFirst']) >= 0 and int(middle_result[i]['quoteSpeakerCharOffsetsSecond']) >= 0:
+            target_name, target_start, target_end, coref_status = getCoreference(parsed_doc, int(
+                middle_result[i]['quoteSpeakerCharOffsetsFirst']), int(middle_result[i]['quoteSpeakerCharOffsetsSecond']))
+            middle_result[i]['corefMention'] = target_name
+            middle_result[i]['corefOffsetBegin'] = str(target_start)
+            middle_result[i]['corefOffsetEnd'] = str(target_end)
+            middle_result[i]['corefStatus'] = str(coref_status)
 
+            linking_result = getEntity(target_name)
+            if linking_result is not None:
+                middle_result[i]['mention'] = linking_result['label']
+                middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
+                    linking_result['label'].strip().replace(' ', "_")
+                middle_result[i]['mentionID'] = linking_result['id']
+                middle_result[i]['mentionSpan'] = linking_result['span']
+                middle_result[i]['mentionAbout'] = linking_result['description']
+                middle_result[i]['mentionProperty'] = '&'.join(
+                    linking_result['super_entities'])
+                middle_result[i]['linkStatus']="True"
+            else:
+                middle_result[i]['mention'] = target_name
+                middle_result[i]['linkStatus']="False"
         else:
-            linked = getEntity("[START_ENT] "+middle_result[i]
-                               ['mentionRaw']+" [END_ENT]")
-            middle_result[i]['mention'] = linked[0]
-            middle_result[i]['mentionLinkLogProb'] = linked[1]
-            middle_result[i]['links'] = "https://en.wikipedia.org/wiki/" + \
-                linked[0].strip().replace(' ', "_")
+            raise Exception("无效的引语区间")
     linking_time = time.time()
     return middle_result, token_time, extract_time, process_time, parsing_time, linking_time
 
@@ -342,7 +318,7 @@ def folderProcess(folder_path, output_folder_path):
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
                     start_time = time.time()
-                    entity_linking_sum=0.0
+                    entity_linking_sum = 0.0
                     data = json.loads(f.read())
                     data['content'] = data['content'].replace("''", "\"").replace("„", "\"").replace("“", "\"").replace("‟", "\"").replace("”", "\"").replace(
                         "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")
@@ -352,8 +328,7 @@ def folderProcess(folder_path, output_folder_path):
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
                         json.dump(data, fw)
                 logger.info("进度：{:.2f}%\t输出文件 {}\t总耗时{:.0f}ms\t分词耗时{:.0f}ms\t提取耗时{:.0f}ms\t处理耗时{:.0f}ms\t指代消解耗时{:.0f}ms\t实体链接耗时{:.0f}ms\t实体链接实际耗时{:.0f}ms".format(no/files_len*100, i, (time.time()-start_time)
-                            * 1000, (token_time-start_time)*1000, (extract_time-token_time)*1000, (process_time-extract_time)*1000, (parsing_time-process_time)*1000, (linking_time-parsing_time)*1000,entity_linking_sum*1000))
-                logger.debug("momo size = "+str(len(memo.keys())))
+                            * 1000, (token_time-start_time)*1000, (extract_time-token_time)*1000, (process_time-extract_time)*1000, (parsing_time-process_time)*1000, (linking_time-parsing_time)*1000, entity_linking_sum*1000))
             else:
                 logger.warning("忽略文件 "+str(i))
         except Exception:
