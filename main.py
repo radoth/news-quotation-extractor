@@ -337,5 +337,5 @@ def folderProcess(folder_path, output_folder_path):
 
 logger.info("加载完成，开始处理文件")
 
-folderProcess("testin",
-              "testout")
+folderProcess("input",
+              "output")

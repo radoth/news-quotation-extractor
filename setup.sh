@@ -5,4 +5,3 @@ python -m spacy download en
 echo downloading wikidata......
 python -m spacyEntityLinker "download_knowledge_base"
 cd ../
-python main.py
