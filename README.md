@@ -9,7 +9,7 @@
 运行：
 ```
 bash setup.sh
-python main.sh
+python main.py
 ```
 
 JSON 字段含义：
