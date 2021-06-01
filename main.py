@@ -294,10 +294,10 @@ def extractText(txt):
                 middle_result[i]['mentionAbout'] = linking_result['description']
                 middle_result[i]['mentionProperty'] = '&'.join(
                     linking_result['super_entities'])
-                middle_result[i]['linkStatus']="True"
+                middle_result[i]['linkStatus'] = "True"
             else:
                 middle_result[i]['mention'] = target_name
-                middle_result[i]['linkStatus']="False"
+                middle_result[i]['linkStatus'] = "False"
         else:
             raise Exception("无效的引语区间")
     linking_time = time.time()
