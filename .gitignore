@@ -4,7 +4,6 @@ ApplyModel.ipynb
 .idea/
 checkpoint-3300/
 log.txt
-neuralcoref/
 testin/
+testout/
 FirstModel.zip
-!neuralcoref/requirements.txt
