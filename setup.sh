@@ -1,5 +1,5 @@
 conda create -n quote -y python=3.8
-conda activate 
+conda activate quote
 cd neuralcoref
 pip install -r requirements.txt
 pip install -e .

@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from transformers import AlbertForTokenClassification
+from transformers import BertForTokenClassification
 from torch.utils.data.dataloader import DataLoader
 import torch
 from transformers import AutoTokenizer
@@ -36,7 +36,7 @@ logger.addHandler(console)
 
 logger.info("加载引语模型")
 tokenizer = AutoTokenizer.from_pretrained('bert-base-cased')
-model = AlbertForTokenClassification.from_pretrained(
+model = BertForTokenClassification.from_pretrained(
     "models/checkpoint-1400/", num_labels=8).to(device).eval()
 
 logger.info("加载指代消解模型")
