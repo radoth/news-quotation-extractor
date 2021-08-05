@@ -35,9 +35,9 @@ logger.addHandler(handler)
 logger.addHandler(console)
 
 logger.info("加载引语模型")
-tokenizer = AutoTokenizer.from_pretrained('albert-base-v2')
+tokenizer = AutoTokenizer.from_pretrained('bert-base-cased')
 model = AlbertForTokenClassification.from_pretrained(
-    "models/checkpoint-1200/", num_labels=8).to(device).eval()
+    "models/checkpoint-1400/", num_labels=8).to(device).eval()
 
 logger.info("加载指代消解模型")
 nlp = spacy.load('en_core_web_sm')
