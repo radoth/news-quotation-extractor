@@ -21,7 +21,7 @@ JSON 字段含义：
 |   time   |  新闻发表时间    |
 |   source   |  新闻来源    |
 |   content   |  新闻正文（**必须用\n分割**）    |
-|   quote   |  引语    |
+|   quote   |  引语数组，内含多个引语条目    |
 |   quoteSpeakerCharOffsetsFirst   | 说话人字符串在正文的偏移量     |
 |   quoteSpeakerCharOffsetsSecond   | 说话人字符串在正文的偏移量      |
 |   quotation   | 引语正文     |
