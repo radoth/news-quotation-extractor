@@ -1,16 +1,24 @@
 # QuoteBERT
 
+说明：完成引语提取、引语归因和实体链接任务。引语提取和引语归因采用一个 fine-tunedBERT 模型，实体链接采用 neuralcoref 开源工具包完成。
+
 要求：Python 3
 
-模型：下载到 models 目录下。
+模型参数：将提供的模型checkpoint下载到 models 目录下。
 
-输入/输出样例：见 input 和 output 目录。
+输入/输出样例：见 input 和 output 目录。每个json文件是一篇新闻，每个输入对应一个输出。
 
-运行：
+配置：
 ```
 bash setup.sh
+```
+
+运行一次：
+```
 python main.py
 ```
+程序将读入input目录下的所有输入，处理后以相同的文件名输出到output目录中。
+
 
 JSON 字段含义：
 
