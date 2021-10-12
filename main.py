@@ -12,13 +12,15 @@ import spacy
 import neuralcoref
 from spacyEntityLinker import EntityLinker
 
+# 设置参数
 device = "cuda"
 eval_batch_size = 16
 
+# 代词表，用于指代消解
 pronouns = ["i", "me", "you", "he", "him", "she", "her", "it", "we", "us", "they", "them", "my", "mine", "your", "yours",
             "his", "her", "hers", "its", "our", "ours", "their", "theirs"]
 
-# 初始化logger
+# 初始化logger和模型
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 handler = logging.FileHandler("log.txt")
@@ -49,7 +51,7 @@ entityLinker = EntityLinker()
 nlp2.add_pipe(entityLinker, last=True, name="entityLinker")
 
 
-# 构造数据集
+# 构造数据集，所有输入句子形成一个TestDataset用于BERT输入
 
 
 class TestDataset(torch.utils.data.Dataset):
@@ -66,6 +68,9 @@ class TestDataset(torch.utils.data.Dataset):
 
 
 def predict(dataset):
+    """
+    运行BERT模型。
+    """
     loader = DataLoader(dataset, batch_size=eval_batch_size)
     model.eval()
     output = np.array([])
@@ -80,6 +85,9 @@ def predict(dataset):
 
 
 def segment(txt):
+    """
+    文本分段。
+    """
     pos = 0
     segs = []
     offsets = []
@@ -99,6 +107,15 @@ def segment(txt):
 
 
 def displayFormatResult(input_id, attention, prediction, offset_map, overall_offset):
+    """
+    BERT的输出结果是一个label组成序列，该函数读入BERT的运行输出，将其转换为多个引语组成的列表。
+    @param input_id: BERT的输入序列
+    @param attention: BERT的注意力掩码
+    @param prediction: BERT预测结果
+    @param offset_map: BERT分词结果对应原字符串的偏移量
+    @param overall_offset: 该句子所在段落在整篇新闻中的偏移量
+    @return: 每个引语是一个字典，含有引语的有关信息（见README.md），多个引语组成字典
+    """
     result = []
     predict = np.argmax(prediction, axis=2)
     for i in range(len(input_id)):
@@ -225,6 +242,9 @@ entity_linking_sum = 0
 
 
 def getEntity(txt):
+    """
+    对某个字符串进行实体链接。
+    """
     global entity_linking_sum
     count = time.time()
     doc = nlp2(txt)
@@ -245,6 +265,14 @@ def getEntity(txt):
 
 # 指代消解
 def getCoreference(parsed_doc, speaker_begin, speaker_end):
+    """
+    为字符串中某个说话人执行指代消解。
+
+    @param parsed_doc: 经过spacy处理后的文档
+    @param speaker_begin: 说话人起始字符位置
+    @param speaker_end: 说话人结束字符位置
+    @return: 指代消解的结果，起止点，是否指代消解成功
+    """
     sent_span = parsed_doc.char_span(
         speaker_begin, speaker_end, alignment_mode="expand")
     if sent_span._.is_coref:
@@ -258,6 +286,12 @@ def getCoreference(parsed_doc, speaker_begin, speaker_end):
 
 
 def extractText(txt):
+    """
+    完成一个字符串的引语提取、归因和实体链接
+
+    @param txt: 输入的文本字符串
+    @return: middle_result 是包含处理结果的字典，token_time, extract_time, process_time, parsing_time, linking_time是每个阶段的耗时
+    """
     segs, offsets = segment(txt)
     res = tokenizer(segs, padding='max_length', max_length=511,
                     truncation=True, return_offsets_mapping=True, return_tensors="pt").to(device)
@@ -307,6 +341,13 @@ def extractText(txt):
 
 
 def folderProcess(folder_path, output_folder_path):
+    """
+    处理input和output文件夹，遍历input中的所有json文件，输出到output文件夹中
+
+    @param folder_path: 输入文件夹路径
+    @param output_folder_path: 输出文件夹路径
+    @return:
+    """
     global entity_linking_sum
     files = sorted(os.listdir(folder_path))
     files_len = len(files)
@@ -317,13 +358,13 @@ def folderProcess(folder_path, output_folder_path):
         try:
             if i.endswith('.json'):
                 with open(os.path.join(folder_path, i), encoding='utf-8') as f:
-                    start_time = time.time()
+                    start_time = time.time()        #开始计时
                     entity_linking_sum = 0.0
                     data = json.loads(f.read())
                     data['content'] = data['content'].replace("''", "\"").replace("„", "\"").replace("“", "\"").replace("‟", "\"").replace("”", "\"").replace(
-                        "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")
+                        "〝", "\"").replace("〞", "\"").replace("〟", "\"").replace("‘", "'").replace("’", "'").replace("‛", "'").replace(",", ",").replace("—", "-")       #替换非法字符
                     quote_dict, token_time, extract_time, process_time, parsing_time, linking_time = extractText(
-                        data['content'])
+                        data['content'])            # 完成引语提取、归因和实体链接
                     data['quote'] = quote_dict
                     with open(os.path.join(output_folder_path, i), 'w', encoding="utf-8") as fw:
                         json.dump(data, fw)
