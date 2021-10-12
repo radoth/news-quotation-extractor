@@ -2,7 +2,8 @@
 
 说明：完成引语提取、引语归因和实体链接任务。引语提取和引语归因采用一个 fine-tunedBERT 模型，实体链接采用 neuralcoref 开源工具包完成。
 
-要求：Python 3
+要求：Python 3、Anaconda 环境
+（使用其他虚拟环境需要修改setup.sh）
 
 模型参数：将提供的模型checkpoint下载到 models 目录下。
 
