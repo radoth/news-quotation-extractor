@@ -107,8 +107,7 @@ print(multi_text_co_occur(input,300),id2entity)
 2. 实体ID和实体本身的对应关系id2entity，例如：
 
 ```
-{492313: 
-{'label': 'Park Jin-young', 'link': 'https://en.wikipedia.org/wiki/Park_Jin-young', 'id': '492313', 'span': 'Jr.', 'description': 'South Korean singer and actor born on September 22, 1994', 'super_entities': ('human',)},
+{492313: {'label': 'Park Jin-young', 'link': 'https://en.wikipedia.org/wiki/Park_Jin-young', 'id': '492313', 'span': 'Jr.', 'description': 'South Korean singer and actor born on September 22, 1994', 'super_entities': ('human',)},
 
 1316: {'label': 'Saddam Hussein', 'link': 'https://en.wikipedia.org/wiki/Saddam_Hussein', 'id': '1316', 'span': 'Saddam Hussein', 'description': 'Iraqi politician and President', 'super_entities': ('human',)}, 
 
