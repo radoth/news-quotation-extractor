@@ -1,5 +1,5 @@
 # News Quotation Extractor
-
+2024.07.24 UPDATE 增加新模型。
 2022.01.15 UPDATE 新增多文本共现计算功能。
 
 
