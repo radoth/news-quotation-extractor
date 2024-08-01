@@ -1,8 +1,46 @@
 # News Quotation Extractor
-2024.07.24 UPDATE 增加新模型。
+2024.07.24 UPDATE 增加大语言模型版本。
 2022.01.15 UPDATE 新增多文本共现计算功能。
 
 
+
+## 大语言模型完成引语抽取
+说明：使用 LLM 完成引语提取和引语归因任务。
+
+输入样例：processed_en_news.json
+输出样例：out.json
+
+
+运行一次：
+
+```
+python llm.py
+```
+
+程序将读入processed_en_news.json目录下的所有输入，处理后以out.json输出。
+每个JSON可以包含多个新闻文本。
+
+
+JSON 字段含义：
+
+| 字段  |   含义  |
+| ---- | ---- |
+|   articleNum   |  文件名    |
+|   title   |  新闻标题    |
+|   time   |  新闻发表时间    |
+|   source   |  新闻来源    |
+|   content   |  新闻正文   |
+|   quote   |  引语数组，内含多个引语条目    |
+|   quoteSpeakerCharOffsetsFirst   | 说话人字符串在正文的偏移量     |
+|   quoteSpeakerCharOffsetsSecond   | 说话人字符串在正文的偏移量      |
+|   quotation   | 引语正文     |
+|   quoteCharOffsetsFirst   | 引语字符串在正文的偏移量     |
+|   quoteCharOffsetsSecond   | 引语字符串在正文的偏移量     |
+|   mention   | 说话人的名字     |
+
+
+
+## 小模型引语流水线
 
 说明：完成引语提取、引语归因、实体链接和共现计算任务。引语提取和引语归因采用一个 fine-tunedBERT 模型，实体链接采用 neuralcoref 开源工具包完成。
 
@@ -13,10 +51,6 @@
 ```
 bash setup.sh
 ```
-
-
-
-## 引语抽取
 
 模型参数：将提供的模型checkpoint下载到 models 目录下。
 
@@ -59,9 +93,7 @@ JSON 字段含义：
 |   mentionProperty   | 说话人具有的属性</br>例如：人、组织、机构     |
 |   linkStatus   | 实体链接是否成功     |
 
-
-
-## 共现计算
+共现计算：
 
 运行一次：
 
