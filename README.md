@@ -1,11 +1,14 @@
 # News Quotation Extractor
 2024.07.24 UPDATE 增加大语言模型版本。
+
 2022.01.15 UPDATE 新增多文本共现计算功能。
 
 
 
 ## 大语言模型完成引语抽取
 说明：使用 LLM 完成引语提取和引语归因任务。
+
+LLM Backend：以 VLLM 部署LLM，以 OpenAI API 格式调用，需要在 llm.py 修改 LLM 服务地址。
 
 输入样例：processed_en_news.json
 
