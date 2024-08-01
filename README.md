@@ -8,6 +8,7 @@
 说明：使用 LLM 完成引语提取和引语归因任务。
 
 输入样例：processed_en_news.json
+
 输出样例：out.json
 
 
@@ -18,6 +19,7 @@ python llm.py
 ```
 
 程序将读入processed_en_news.json目录下的所有输入，处理后以out.json输出。
+
 每个JSON可以包含多个新闻文本。
 
 
