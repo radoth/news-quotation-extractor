@@ -5,9 +5,9 @@ client = OpenAI(base_url="http://localhost:18888/v1",api_key="123")
 
 def extract_quoted_strings(text):
   # 用正则表达式提取引号内的句子
-    pattern = re.compile(r'(["“”«»„‟‟❝❞＂])([^"\n]+)\1?')
+    pattern = re.compile(r'["“”](.*?)["“”]')
     matches = pattern.findall(text)
-    quoted_strings = [match[1] for match in matches]
+    quoted_strings = [match for match in matches]
     filter_quotes=[]
     for i in quoted_strings:
         if i.count(" ")>3:
